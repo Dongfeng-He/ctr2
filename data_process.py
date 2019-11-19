@@ -168,6 +168,7 @@ if __name__ == "__main__":
     member_df['num_subscribe_topics'] = member_df['subscribe_topics'].apply(len)
     member_df['num_interest_topics'] = member_df['interest_topics'].apply(len)  # 人工计算，上限为10
 
+
     """
     将 member_df 和 question_df 合并进 invite_df
     """
