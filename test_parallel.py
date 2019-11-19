@@ -9,7 +9,7 @@ import os
 from pandarallel import pandarallel
 
 
-pandarallel.initialize(nb_workers=16)
+pandarallel.initialize(nb_workers=4)
 
 
 def add_to_dict(item, my_dict):
