@@ -138,8 +138,8 @@ if __name__ == "__main__":
     answer_df["info"] = answer_df["info"].parallel_apply(lambda x: x.split("|"))
     invite_success_df["info"] = invite_success_df["info"].parallel_apply(lambda x: x.split("|"))
     # 每个用户的回答/受邀列表
-    member_answers = answer_df.groupby("member")["info"].parallel_apply(list).reset_index()
-    member_invites = invite_success_df.groupby("member")["info"].parallel_apply(list).reset_index()
+    member_answers = answer_df.groupby("member")["info"].apply(list).reset_index()
+    member_invites = invite_success_df.groupby("member")["info"].apply(list).reset_index()
     member_record = pd.merge(member_answers, member_invites, how="outer", on=["member"])
     member_record["info_x"] = member_record["info_x"].parallel_apply(lambda x: x if isinstance(x, list) else [])
     member_record["info_y"] = member_record["info_y"].parallel_apply(lambda x: x if isinstance(x, list) else [])
