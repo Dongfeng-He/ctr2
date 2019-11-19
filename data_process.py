@@ -86,7 +86,7 @@ if __name__ == "__main__":
     if os.path.exists("/Volumes/hedongfeng/数据集/专家发现/data_set_0926/"):
         data_dir = "/Volumes/hedongfeng/数据集/专家发现/data_set_0926/"
     else:
-        data_dir = "/root/ctr2/数据集/专家发现/data_set_0926/"
+        data_dir = "/root/ctr2/data_set_0926/"
     # answer_info_0926、invite_info_evaluate_1_0926、invite_info_0926、member_info_0926、question_info_0926
     # single_word_vectors_64d、topic_vectors_64d、word_vectors_64d
     # 正负例比例、
@@ -168,13 +168,12 @@ if __name__ == "__main__":
     member_df['num_subscribe_topics'] = member_df['subscribe_topics'].apply(len)
     member_df['num_interest_topics'] = member_df['interest_topics'].apply(len)  # 人工计算，上限为10
 
-
     """
     将 member_df 和 question_df 合并进 invite_df
     """
     invite_df = pd.merge(invite_df, member_df, how='left', on='member')
     invite_df = pd.merge(invite_df, question_df, how='left', on='question')
-    invite_df.to_csv("/Volumes/hedongfeng/数据集/专家发现/invite_df.csv", index=False, sep='\t')
+    invite_df.to_csv("invite_df.csv", index=False, sep='\t')
     """
     处理 question 和 member 交互
     """
