@@ -9,8 +9,6 @@ import os
 
 
 if __name__ == "__main__":
-    invite_df = pd.read_csv("/root/ctr2/invite_df.csv",
-                                header=None, sep='\t',
-                                nrows=100
-                                )
+    invite_df = pd.read_csv("/root/ctr2/invite_df.csv", sep='\t', nrows=100)
+    invite_df_head = invite_df.head(100)
     invite_df.to_csv("invite_df_head.csv", index=False, sep='\t')

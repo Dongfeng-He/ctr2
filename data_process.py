@@ -110,7 +110,7 @@ if __name__ == "__main__":
                          "rec_flag", "round_flag", "has_pic", "has_video", "word_cnt", "upvote_cnt", "upvote_cancel_cnt",
                          "comment_cnt", "collect_cnt", "thank_cnt", "report_cnt", "helpless_cnt", "downvote_cnt"]
     invite_df.columns = ["question", "member", "time", "label"]
-    question_df.columns = ["question", "time", "title_single_words", "title_words", "content_single_words",
+    question_df.columns = ["question", "question_time", "title_single_words", "title_words", "content_single_words",
                            "content_words", "topics"]
     member_df.columns = ["member", "gender", "creation_keywrods", "creation_level", "creation_popularity",
                          "register_type", "register_platform", "frequency", "bi_feat1", "bi_feat2", "bi_feat3",
@@ -169,10 +169,11 @@ if __name__ == "__main__":
     member_df['num_interest_topics'] = member_df['interest_topics'].apply(len)  # 人工计算，上限为10
 
     """
-    将 member_df 和 question_df 合并进 invite_df
+    将 member_df、question_df 和 member_record 合并进 invite_df
     """
     invite_df = pd.merge(invite_df, member_df, how='left', on='member')
     invite_df = pd.merge(invite_df, question_df, how='left', on='question')
+    invite_df = pd.merge(invite_df, member_record, how='left', on='member')
     invite_df.to_csv("invite_df.csv", index=False, sep='\t')
     """
     处理 question 和 member 交互
