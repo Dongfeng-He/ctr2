@@ -16,8 +16,6 @@ from sklearn.preprocessing import LabelEncoder
 
 
 def drop_duplicate_record(record):
-    print(record)
-    print(type(record))
     if len(record) > 0:
         invite_answers = list(map(lambda x: x[0], filter(lambda x: x[2] == "1", record)))
         result = list(filter(lambda x: (x[0] in invite_answers and x[2] == "0") is False, record))
