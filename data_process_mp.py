@@ -7,12 +7,15 @@ from itertools import chain
 import datetime
 
 import gc
+from multiprocessing import Pool
+
 import numpy as np
 import pandas as pd
 from lightgbm import LGBMClassifier
 from scipy import stats
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
+import gc
 
 
 def drop_duplicate_record(record):
@@ -304,6 +307,85 @@ class Timer:
         self.time_list.append(current_time)
 
 
+def process_invite(index, invite_df):
+    # 去掉 answer 中重复的问题（即使 answer 又是 invite）
+    invite_df["answer_list"] = invite_df["answer_list"].apply(lambda x: x if isinstance(x, list) else [])
+    invite_df["answer_list"] = invite_df["answer_list"].apply(drop_duplicate_record)
+    # 处理回答记录
+    (invite_df["previous_answer"], invite_df["max_days_diff"], invite_df["min_days_diff"], invite_df["answer_trend"],
+     invite_df["last_answer_day_gap"], invite_df["last_invite_day_gap"], invite_df["answer_mean_hour_gap"],
+     invite_df["invite_mean_hour_gap"], invite_df["answer_min_hour_gap"], invite_df["invite_min_hour_gap"],
+     invite_df["answer_num_1"], invite_df["answer_num_2"], invite_df["answer_num_3"], invite_df["answer_num_4"],
+     invite_df["answer_num_5"], invite_df["answer_num_6"], invite_df["invite_num_1"], invite_df["invite_num_2"],
+     invite_df["invite_num_3"], invite_df["invite_num_4"], invite_df["invite_num_5"], invite_df["invite_num_6"],
+     invite_df["record_num"], invite_df["invite_num"], invite_df["invite_ratio"], invite_df["week_num_1"],
+     invite_df["week_num_2"], invite_df["week_num_3"], invite_df["week_num_4"], invite_df["week_num_5"],
+     invite_df["week_num_6"], invite_df["week_num_7"], invite_df["week_num"], invite_df["current_week"],
+     invite_df["current_hour"], invite_df["current_week_hour"], invite_df["last_type"]
+     ) = zip(*invite_df.apply(process_record, axis=1))
+    # 得到回答和感兴趣 topics 的 topic_list 和 weight_list
+    invite_df["answer_topics"], invite_df["answer_topics_weight"] = zip(*invite_df["previous_answer"].apply(get_answer_topics_and_weight))
+    invite_df["interest_topics"], invite_df["interest_topics_weight"] = zip(*invite_df["interest_topics"].apply(get_interest_topics_and_weight))
+    # 将 回答、感兴趣、关注、问题的 topic_list 映射成向量，计算点乘得分
+    invite_df["answer_to_question_score"], invite_df["question_to_answer_score"] = zip(*invite_df.apply(lambda row: cal_cos_dist(row["answer_topics"], row["topics"]), axis=1))
+    invite_df["interest_to_question_score"], invite_df["question_to_interest_score"] = zip(*invite_df.apply(lambda row: cal_cos_dist(row["interest_topics"], row["topics"]), axis=1))
+    invite_df["subscribe_to_question_score"], invite_df["question_to_subscribe_score"] = zip(*invite_df.apply(lambda row: cal_cos_dist(row["subscribe_topics"], row["topics"]), axis=1))
+    # 回答、感兴趣的 topics 对问题 topics 加权分数
+    (invite_df["answer_weighted_sum"], invite_df["answer_weighted_mean"], invite_df["interest_weighted_sum"],
+     invite_df["interest_weighted_mean"]) = zip(*invite_df.apply(cal_topic_weighted_score, axis=1))
+    # 问题 topics 对回答、感兴趣、关注 topics 的最大值、最小值、均值、峰度、高分个数、高分比例
+    invite_df["question_to_answer_score_max"] = invite_df["question_to_answer_score"].apply(lambda x: np.max(x) if len(x) > 0 else np.nan)
+    invite_df["question_to_answer_score_min"] = invite_df["question_to_answer_score"].apply(lambda x: np.min(x) if len(x) > 0 else np.nan)
+    invite_df["question_to_answer_score_mean"] = invite_df["question_to_answer_score"].apply(lambda x: np.mean(x) if len(x) > 0 else np.nan)
+    invite_df["question_to_answer_score_kurt"] = invite_df["question_to_answer_score"].apply(lambda x: stats.kurtosis(x) if len(x) > 0 else np.nan)
+    invite_df["question_to_answer_high_score_num"] = invite_df["question_to_answer_score"].apply(lambda x: np.sum(np.array(x) > 0.8) if len(x) > 0 else 0)
+    invite_df["question_to_answer_high_score_ratio"] = invite_df["question_to_answer_score"].apply(lambda x: np.sum(np.array(x) > 0.8) / len(x) if len(x) > 0 else 0)
+    invite_df["question_to_interest_score_max"] = invite_df["question_to_interest_score"].apply(lambda x: np.max(x) if len(x) > 0 else np.nan)
+    invite_df["question_to_interest_score_min"] = invite_df["question_to_interest_score"].apply(lambda x: np.min(x) if len(x) > 0 else np.nan)
+    invite_df["question_to_interest_score_mean"] = invite_df["question_to_interest_score"].apply(lambda x: np.mean(x) if len(x) > 0 else np.nan)
+    invite_df["question_to_interest_score_kurt"] = invite_df["question_to_interest_score"].apply(lambda x: stats.kurtosis(x) if len(x) > 0 else np.nan)
+    invite_df["question_to_interest_score_num"] = invite_df["question_to_interest_score"].apply(lambda x: np.sum(np.array(x) > 0.8) if len(x) > 0 else 0)
+    invite_df["question_to_interest_score_ratio"] = invite_df["question_to_interest_score"].apply(lambda x: np.sum(np.array(x) > 0.8) / len(x) if len(x) > 0 else 0)
+    invite_df["question_to_subscribe_score_max"] = invite_df["question_to_subscribe_score"].apply(lambda x: np.max(x) if len(x) > 0 else np.nan)
+    invite_df["question_to_subscribe_score_min"] = invite_df["question_to_subscribe_score"].apply(lambda x: np.min(x) if len(x) > 0 else np.nan)
+    invite_df["question_to_subscribe_score_mean"] = invite_df["question_to_subscribe_score"].apply(lambda x: np.mean(x) if len(x) > 0 else np.nan)
+    invite_df["question_to_subscribe_score_kurt"] = invite_df["question_to_subscribe_score"].apply(lambda x: stats.kurtosis(x) if len(x) > 0 else np.nan)
+    invite_df["question_to_subscribe_score_num"] = invite_df["question_to_subscribe_score"].apply(lambda x: np.sum(np.array(x) > 0.8) if len(x) > 0 else 0)
+    invite_df["question_to_subscribe_score_ratio"] = invite_df["question_to_subscribe_score"].apply(lambda x: np.sum(np.array(x) > 0.8) / len(x) if len(x) > 0 else 0)
+    # TODO: 对于importance高的score特征，可以做细分，问题topic score，多少到了0.95，0.8，0.5
+    # 问题创建时间与现在时间差值
+    invite_df["question_duration"] = invite_df.apply(lambda row: extract_day_and_hour(row["time"])[0] - extract_day_and_hour(row["question_time"])[0], axis=1)
+    # Drop 不进模型的字段
+    invite_df = invite_df.drop(["question", "member", "time", "creation_keywrods", "creation_level",
+                                "creation_popularity", "register_type", "register_platform", "subscribe_topics",
+                                "interest_topics", "question_time", "title_single_words", "title_words",
+                                "content_single_words", "content_words", "topics", "answer_list", "previous_answer",
+                                "answer_topics", "answer_topics_weight", "interest_topics_weight",
+                                "answer_to_question_score", "question_to_answer_score", "interest_to_question_score",
+                                "question_to_interest_score", "subscribe_to_question_score",
+                                "question_to_subscribe_score"], axis=1)
+    return index, invite_df
+
+
+def split_df(df, n):
+    chunk_size = int(np.ceil(len(df) / n))
+    return [df[i*chunk_size:(i+1)*chunk_size] for i in range(n)]
+
+
+def gc_mp(pool, apply_results, result_list, chunk_list):
+    for ar in apply_results:
+        del ar
+    for r in result_list:
+        del r
+    for cl in chunk_list:
+        del cl
+    del pool
+    del result_list
+    del apply_results
+    del chunk_list
+    gc.collect()
+
+
 if __name__ == "__main__":
     if os.path.exists("/Volumes/hedongfeng/数据集/专家发现/data_set_0926/"):
         data_dir = "/Volumes/hedongfeng/数据集/专家发现/data_set_0926/"
@@ -406,62 +488,23 @@ if __name__ == "__main__":
     """
     处理 invite_df
     """
-    # 去掉 answer 中重复的问题（即使 answer 又是 invite）
-    invite_df["answer_list"] = invite_df["answer_list"].apply(lambda x: x if isinstance(x, list) else [])
-    invite_df["answer_list"] = invite_df["answer_list"].apply(drop_duplicate_record)
-    # 处理回答记录
-    (invite_df["previous_answer"], invite_df["max_days_diff"], invite_df["min_days_diff"], invite_df["answer_trend"],
-     invite_df["last_answer_day_gap"], invite_df["last_invite_day_gap"], invite_df["answer_mean_hour_gap"],
-     invite_df["invite_mean_hour_gap"], invite_df["answer_min_hour_gap"], invite_df["invite_min_hour_gap"],
-     invite_df["answer_num_1"], invite_df["answer_num_2"], invite_df["answer_num_3"], invite_df["answer_num_4"],
-     invite_df["answer_num_5"], invite_df["answer_num_6"], invite_df["invite_num_1"], invite_df["invite_num_2"],
-     invite_df["invite_num_3"], invite_df["invite_num_4"], invite_df["invite_num_5"], invite_df["invite_num_6"],
-     invite_df["record_num"], invite_df["invite_num"], invite_df["invite_ratio"], invite_df["week_num_1"],
-     invite_df["week_num_2"], invite_df["week_num_3"], invite_df["week_num_4"], invite_df["week_num_5"],
-     invite_df["week_num_6"], invite_df["week_num_7"], invite_df["week_num"], invite_df["current_week"],
-     invite_df["current_hour"], invite_df["current_week_hour"], invite_df["last_type"]
-     ) = zip(*invite_df.apply(process_record, axis=1))
-    # 得到回答和感兴趣 topics 的 topic_list 和 weight_list
-    invite_df["answer_topics"], invite_df["answer_topics_weight"] = zip(*invite_df["previous_answer"].apply(get_answer_topics_and_weight))
-    invite_df["interest_topics"], invite_df["interest_topics_weight"] = zip(*invite_df["interest_topics"].apply(get_interest_topics_and_weight))
-    # 将 回答、感兴趣、关注、问题的 topic_list 映射成向量，计算点乘得分
-    invite_df["answer_to_question_score"], invite_df["question_to_answer_score"] = zip(*invite_df.apply(lambda row: cal_cos_dist(row["answer_topics"], row["topics"]), axis=1))
-    invite_df["interest_to_question_score"], invite_df["question_to_interest_score"] = zip(*invite_df.apply(lambda row: cal_cos_dist(row["interest_topics"], row["topics"]), axis=1))
-    invite_df["subscribe_to_question_score"], invite_df["question_to_subscribe_score"] = zip(*invite_df.apply(lambda row: cal_cos_dist(row["subscribe_topics"], row["topics"]), axis=1))
-    # 回答、感兴趣的 topics 对问题 topics 加权分数
-    (invite_df["answer_weighted_sum"], invite_df["answer_weighted_mean"], invite_df["interest_weighted_sum"],
-     invite_df["interest_weighted_mean"]) = zip(*invite_df.apply(cal_topic_weighted_score, axis=1))
-    # 问题 topics 对回答、感兴趣、关注 topics 的最大值、最小值、均值、峰度、高分个数、高分比例
-    invite_df["question_to_answer_score_max"] = invite_df["question_to_answer_score"].apply(lambda x: np.max(x) if len(x) > 0 else np.nan)
-    invite_df["question_to_answer_score_min"] = invite_df["question_to_answer_score"].apply(lambda x: np.min(x) if len(x) > 0 else np.nan)
-    invite_df["question_to_answer_score_mean"] = invite_df["question_to_answer_score"].apply(lambda x: np.mean(x) if len(x) > 0 else np.nan)
-    invite_df["question_to_answer_score_kurt"] = invite_df["question_to_answer_score"].apply(lambda x: stats.kurtosis(x) if len(x) > 0 else np.nan)
-    invite_df["question_to_answer_high_score_num"] = invite_df["question_to_answer_score"].apply(lambda x: np.sum(np.array(x) > 0.8) if len(x) > 0 else 0)
-    invite_df["question_to_answer_high_score_ratio"] = invite_df["question_to_answer_score"].apply(lambda x: np.sum(np.array(x) > 0.8) / len(x) if len(x) > 0 else 0)
-    invite_df["question_to_interest_score_max"] = invite_df["question_to_interest_score"].apply(lambda x: np.max(x) if len(x) > 0 else np.nan)
-    invite_df["question_to_interest_score_min"] = invite_df["question_to_interest_score"].apply(lambda x: np.min(x) if len(x) > 0 else np.nan)
-    invite_df["question_to_interest_score_mean"] = invite_df["question_to_interest_score"].apply(lambda x: np.mean(x) if len(x) > 0 else np.nan)
-    invite_df["question_to_interest_score_kurt"] = invite_df["question_to_interest_score"].apply(lambda x: stats.kurtosis(x) if len(x) > 0 else np.nan)
-    invite_df["question_to_interest_score_num"] = invite_df["question_to_interest_score"].apply(lambda x: np.sum(np.array(x) > 0.8) if len(x) > 0 else 0)
-    invite_df["question_to_interest_score_ratio"] = invite_df["question_to_interest_score"].apply(lambda x: np.sum(np.array(x) > 0.8) / len(x) if len(x) > 0 else 0)
-    invite_df["question_to_subscribe_score_max"] = invite_df["question_to_subscribe_score"].apply(lambda x: np.max(x) if len(x) > 0 else np.nan)
-    invite_df["question_to_subscribe_score_min"] = invite_df["question_to_subscribe_score"].apply(lambda x: np.min(x) if len(x) > 0 else np.nan)
-    invite_df["question_to_subscribe_score_mean"] = invite_df["question_to_subscribe_score"].apply(lambda x: np.mean(x) if len(x) > 0 else np.nan)
-    invite_df["question_to_subscribe_score_kurt"] = invite_df["question_to_subscribe_score"].apply(lambda x: stats.kurtosis(x) if len(x) > 0 else np.nan)
-    invite_df["question_to_subscribe_score_num"] = invite_df["question_to_subscribe_score"].apply(lambda x: np.sum(np.array(x) > 0.8) if len(x) > 0 else 0)
-    invite_df["question_to_subscribe_score_ratio"] = invite_df["question_to_subscribe_score"].apply(lambda x: np.sum(np.array(x) > 0.8) / len(x) if len(x) > 0 else 0)
-    # TODO: 对于importance高的score特征，可以做细分，问题topic score，多少到了0.95，0.8，0.5
-    # 问题创建时间与现在时间差值
-    invite_df["question_duration"] = invite_df.apply(lambda row: extract_day_and_hour(row["time"])[0] - extract_day_and_hour(row["question_time"])[0], axis=1)
-    # Drop 不进模型的字段
-    invite_df = invite_df.drop(["question", "member", "time", "creation_keywrods", "creation_level",
-                                "creation_popularity", "register_type", "register_platform", "subscribe_topics",
-                                "interest_topics", "question_time", "title_single_words", "title_words",
-                                "content_single_words", "content_words", "topics", "answer_list", "previous_answer",
-                                "answer_topics", "answer_topics_weight", "interest_topics_weight",
-                                "answer_to_question_score", "question_to_answer_score", "interest_to_question_score",
-                                "question_to_interest_score", "subscribe_to_question_score",
-                                "question_to_subscribe_score"], axis=1)
+    chunk_list = split_df(invite_df, 160)
+    del invite_df
+    gc.collect()
+    pool = Pool(processes=16)
+    apply_results = []
+    for index, chunk_df in enumerate(chunk_list):
+        apply_results.append(pool.apply_async(process_invite, (index, chunk_df,)))
+    pool.close()
+    pool.join()
+    result_list = []
+    for res in apply_results:
+        result = res.get()
+        result_list.append(result)
+    result_list.sort(key=lambda x: x[0])
+    result_df_list = list(map(lambda x: x[1], result_list))
+    invite_df = pd.concat(result_df_list)
+    gc_mp(pool, apply_results, result_list, chunk_list)
     # 类别特征转换
     # TODO: '用户id','问题id' 要保留？
     class_feat = ['gender', 'frequency', 'bi_feat1', 'bi_feat2', 'bi_feat3', 'bi_feat4', 'bi_feat5', 'mul_feat1',
