@@ -518,10 +518,9 @@ if __name__ == "__main__":
     """
     训练
     """
-    x_train, x_valid, y_train, y_valid = train_test_split(invite_df[invite_df.columns[1:]], invite_df["label"],
-                                                          test_size=0.2, random_state=66)
-    # y_train = invite_df[:invite_df.shape[0]]['label'].values
-    # X_train = invite_df[:invite_df.shape[0]].drop(['label'], axis=1).values
+    y_train = invite_df["label"].values
+    x_train = invite_df.drop(["label"], axis=1).values
+    x_train, x_valid, y_train, y_valid = train_test_split(x_train, y_train, test_size=0.2, random_state=66)
     model_lgb = LGBMClassifier(boosting_type='gbdt', num_leaves=64, learning_rate=0.01, n_estimators=2000,
                                max_bin=425, subsample_for_bin=50000, objective='binary', min_split_gain=0,
                                min_child_weight=5, min_child_samples=10, subsample=0.8, subsample_freq=1,

@@ -398,23 +398,23 @@ if __name__ == "__main__":
     # 正负例比例、
     answer_df = pd.read_csv(data_dir + "answer_info_0926.txt",
                             header=None, sep='\t',
-                            nrows=100
+                            # nrows=100
                             )
     invite_df = pd.read_csv(data_dir + "invite_info_0926.txt",
                             header=None, sep='\t',
-                            nrows=100
+                            # nrows=100
                             )
     invite_test_df = pd.read_csv(data_dir + "invite_info_evaluate_1_0926.txt",
                             header=None, sep='\t',
-                            nrows=100
+                            # nrows=100
                             )
     member_df = pd.read_csv(data_dir + "member_info_0926.txt",
                             header=None, sep='\t',
-                            nrows=100
+                            # nrows=100
                             )
     question_df = pd.read_csv(data_dir + "question_info_0926.txt",
                               header=None, sep='\t',
-                              nrows=100
+                              # nrows=100
                               )
     answer_df.columns = ["answer", "question", "member", "time", "answer_single_words", "answer_words", "great_flag",
                          "rec_flag", "round_flag", "has_pic", "has_video", "word_cnt", "upvote_cnt", "upvote_cancel_cnt",
