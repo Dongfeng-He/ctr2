@@ -501,6 +501,7 @@ if __name__ == "__main__":
 
 
     invite_df = pd.concat([invite_df, invite_test_df], axis=0, sort=True)
+    print("finished")
     # invite_df["label"] = invite_df["label"].apply(lambda x: -1 if np.isnan(x) else x)
     result_append = invite_df[["question", "member", "original_time"]][train_num:]
     # 删掉不用的 dataframe
