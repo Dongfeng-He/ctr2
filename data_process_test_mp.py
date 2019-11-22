@@ -356,7 +356,7 @@ def process_invite(index, invite_df):
     # 问题创建时间与现在时间差值
     invite_df["question_duration"] = invite_df.apply(lambda row: extract_day_and_hour(row["time"])[0] - extract_day_and_hour(row["question_time"])[0], axis=1)
     # Drop 不进模型的字段
-    invite_df = invite_df.drop(["question", "member", "time", "creation_keywrods", "creation_level",
+    invite_df = invite_df.drop(["question", "member", "time", "original_time", "creation_keywrods", "creation_level",
                                 "creation_popularity", "register_type", "register_platform", "subscribe_topics",
                                 "interest_topics", "question_time", "title_single_words", "title_words",
                                 "content_single_words", "content_words", "topics", "answer_list", "previous_answer",
@@ -398,23 +398,23 @@ if __name__ == "__main__":
     # 正负例比例、
     answer_df = pd.read_csv(data_dir + "answer_info_0926.txt",
                             header=None, sep='\t',
-                            # nrows=100
+                            nrows=100
                             )
     invite_df = pd.read_csv(data_dir + "invite_info_0926.txt",
                             header=None, sep='\t',
-                            # nrows=100
+                            nrows=100
                             )
     invite_test_df = pd.read_csv(data_dir + "invite_info_evaluate_1_0926.txt",
                             header=None, sep='\t',
-                            # nrows=100
+                            nrows=100
                             )
     member_df = pd.read_csv(data_dir + "member_info_0926.txt",
                             header=None, sep='\t',
-                            # nrows=100
+                            nrows=100
                             )
     question_df = pd.read_csv(data_dir + "question_info_0926.txt",
                               header=None, sep='\t',
-                              # nrows=100
+                              nrows=100
                               )
     answer_df.columns = ["answer", "question", "member", "time", "answer_single_words", "answer_words", "great_flag",
                          "rec_flag", "round_flag", "has_pic", "has_video", "word_cnt", "upvote_cnt", "upvote_cancel_cnt",
@@ -434,6 +434,8 @@ if __name__ == "__main__":
     answer_df = answer_df[["question", "member", "time"]]
     # 修正时间的位数
     answer_df["time"] = answer_df["time"].apply(fix_time)
+    invite_df["original_time"] = invite_df["time"]
+    invite_test_df["original_time"] = invite_test_df["time"]
     invite_df["time"] = invite_df["time"].apply(fix_time)
     invite_test_df["time"] = invite_test_df["time"].apply(fix_time)
     # 添加类型，回答是0，邀请是1
@@ -491,9 +493,14 @@ if __name__ == "__main__":
     invite_test_df = pd.merge(invite_test_df, member_df, how='left', on='member')
     invite_test_df = pd.merge(invite_test_df, question_df, how='left', on='question')
     invite_test_df = pd.merge(invite_test_df, member_record, how='left', on='member')
+
+    invite_test_df = invite_test_df.head(200)
+    invite_test_df.to_csv('invite_test_df.txt', index=False, header=False, sep='\t')
+
+
     invite_df = pd.concat([invite_df, invite_test_df], axis=0, sort=True)
     # invite_df["label"] = invite_df["label"].apply(lambda x: -1 if np.isnan(x) else x)
-    result_append = invite_df[["question", "member", "time"]][train_num:]
+    result_append = invite_df[["question", "member", "original_time"]][train_num:]
     # 删掉不用的 dataframe
     del member_df, question_df, member_record, answer_df, invite_success_df
     gc.collect()
