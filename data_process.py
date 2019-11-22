@@ -409,6 +409,7 @@ if __name__ == "__main__":
     处理 invite_df
     """
     # 去掉 answer 中重复的问题（即使 answer 又是 invite）
+    invite_df["answer_list"] = invite_df["answer_list"].apply(lambda x: x if isinstance(x, list) else [])
     invite_df["answer_list"] = invite_df["answer_list"].apply(drop_duplicate_record)
     # 处理回答记录
     (invite_df["previous_answer"], invite_df["max_days_diff"], invite_df["min_days_diff"], invite_df["answer_trend"],
