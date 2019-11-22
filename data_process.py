@@ -16,6 +16,8 @@ from sklearn.preprocessing import LabelEncoder
 
 
 def drop_duplicate_record(record):
+    print(record)
+    print(type(record))
     if len(record) > 0:
         invite_answers = list(map(lambda x: x[0], filter(lambda x: x[2] == "1", record)))
         result = list(filter(lambda x: (x[0] in invite_answers and x[2] == "0") is False, record))
@@ -291,6 +293,19 @@ def parse_map(d):
     return dict([int(z.split(':')[0][1:]), float(z.split(':')[1])] for z in d.split(','))
 
 
+class Timer:
+    def __init__(self, s="开始"):
+        self.time_list = [datetime.datetime.now()]
+        self.time_dict = {s: 0}
+
+    def print_time(self, s, last_s=None):
+        self.time_dict[s] = len(self.time_list)
+        current_time = datetime.datetime.now()
+        last_index = self.time_dict[last_s] if last_s else -1
+        print("%s:" %s, current_time - self.time_list[last_index])
+        self.time_list.append(current_time)
+
+
 if __name__ == "__main__":
     if os.path.exists("/Volumes/hedongfeng/数据集/专家发现/data_set_0926/"):
         data_dir = "/Volumes/hedongfeng/数据集/专家发现/data_set_0926/"
@@ -298,6 +313,7 @@ if __name__ == "__main__":
         data_dir = "/root/ctr2/data_set_0926/"
     # answer_info_0926、invite_info_evaluate_1_0926、invite_info_0926、member_info_0926、question_info_0926
     # single_word_vectors_64d、topic_vectors_64d、word_vectors_64d
+    timer = Timer("开始")
     embedding = get_embedding()
     # 正负例比例、
     answer_df = pd.read_csv(data_dir + "answer_info_0926.txt",
@@ -326,7 +342,7 @@ if __name__ == "__main__":
                          "register_type", "register_platform", "frequency", "bi_feat1", "bi_feat2", "bi_feat3",
                          "bi_feat4", "bi_feat5", "mul_feat1", "mul_feat2", "mul_feat3", "mul_feat4", "mul_feat5",
                          "salt_score", "subscribe_topics", "interest_topics"]
-    start_time = datetime.datetime.now()
+    timer.print_time("加载数据")
     """
     处理 answer_df、invite_df
     """
@@ -354,7 +370,6 @@ if __name__ == "__main__":
     member_record = member_record.drop(["info_x", "info_y"], axis=1)
     # 问题记录按时间排序
     member_record["answer_list"] = member_record["answer_list"].apply(lambda x: sorted(x, key=lambda y: y[1]))
-
     """
     处理 question_df
     """
@@ -371,7 +386,6 @@ if __name__ == "__main__":
     # 制作 question_topic_dict
     question_topic_df = question_df[["question", "topics"]]
     question_topic_dict = {row[0]: row[1] for index, row in question_topic_df.iterrows()}
-
     """
     处理 member_df
     """
@@ -381,7 +395,6 @@ if __name__ == "__main__":
     # 用户关注和感兴趣的 topic 数
     member_df['num_subscribe_topics'] = member_df['subscribe_topics'].apply(len)
     member_df['num_interest_topics'] = member_df['interest_topics'].apply(len)  # 人工计算，上限为10
-
     """
     将 member_df、question_df 和 member_record 合并进 invite_df
     """
@@ -392,7 +405,6 @@ if __name__ == "__main__":
     # 删掉不用的 dataframe
     del member_df, question_df, member_record, answer_df, invite_success_df
     gc.collect()
-
     """
     处理 invite_df
     """
@@ -463,8 +475,7 @@ if __name__ == "__main__":
     for feat in class_feat:
         encoder.fit(invite_df[feat])
         invite_df[feat] = encoder.transform(invite_df[feat])
-    t2 = datetime.datetime.now() - start_time
-    print("特征处理时间: ", t2)
+    timer.print_time("处理数据")
     """
     训练
     """
@@ -482,5 +493,4 @@ if __name__ == "__main__":
                   eval_metric=['logloss', 'auc'],
                   eval_set=[(x_valid, y_valid)],
                   early_stopping_rounds=10)
-    t3 = datetime.datetime.now() - t2
-    print("训练时间: ", t3)
+    timer.print_time("训练时间")
