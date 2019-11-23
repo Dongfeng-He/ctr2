@@ -3,6 +3,7 @@ import json
 import math
 import os
 from collections import Counter
+import xgboost as xgb
 from itertools import chain
 import datetime
 
@@ -400,23 +401,23 @@ if __name__ == "__main__":
     # 正负例比例、
     answer_df = pd.read_csv(data_dir + "answer_info_0926.txt",
                             header=None, sep='\t',
-                            nrows=100
+                            # nrows=100
                             )
     invite_df = pd.read_csv(data_dir + "invite_info_0926.txt",
                             header=None, sep='\t',
-                            nrows=100
+                            # nrows=100
                             )
     invite_test_df = pd.read_csv(data_dir + "invite_info_evaluate_1_0926.txt",
                             header=None, sep='\t',
-                            nrows=100
+                            # nrows=100
                             )
     member_df = pd.read_csv(data_dir + "member_info_0926.txt",
                             header=None, sep='\t',
-                            nrows=100
+                            # nrows=100
                             )
     question_df = pd.read_csv(data_dir + "question_info_0926.txt",
                               header=None, sep='\t',
-                              nrows=100
+                              # nrows=100
                               )
     answer_df.columns = ["answer", "question", "member", "time", "answer_single_words", "answer_words", "great_flag",
                          "rec_flag", "round_flag", "has_pic", "has_video", "word_cnt", "upvote_cnt", "upvote_cancel_cnt",
@@ -495,14 +496,7 @@ if __name__ == "__main__":
     invite_test_df = pd.merge(invite_test_df, member_df, how='left', on='member')
     invite_test_df = pd.merge(invite_test_df, question_df, how='left', on='question')
     invite_test_df = pd.merge(invite_test_df, member_record, how='left', on='member')
-    print(invite_test_df.columns)
-    invite_test_df = invite_test_df.head(200)
-    invite_test_df.to_csv('invite_test_df.txt', index=False, header=False, sep='\t')
-
-
     invite_df = pd.concat([invite_df, invite_test_df], axis=0, sort=True)
-    print("finished")
-    # invite_df["label"] = invite_df["label"].apply(lambda x: -1 if np.isnan(x) else x)
     result_append = invite_df[["question", "member", "original_time"]][train_num:]
     # 删掉不用的 dataframe
     del member_df, question_df, member_record, answer_df, invite_success_df
@@ -540,21 +534,31 @@ if __name__ == "__main__":
     """
     训练
     """
+    param = {"n_estimators": 2000,
+             'learning_rate ': 0.01,
+             'silent': 1,
+             'objective': 'binary:logistic',
+             "eval_metric": "auc",
+             "subsample": 0.8,
+             "min_child_weight": 5,
+             "n_jobs": -1,
+             }
+
     y_train = invite_df[:train_num]["label"].values
     x_train = invite_df[:train_num].drop(["label"], axis=1).values
     x_test = invite_df[train_num:].drop(["label"], axis=1).values
-    x_train, x_valid, y_train, y_valid = train_test_split(x_train, y_train, test_size=0.2, random_state=66)
-    model_lgb = LGBMClassifier(boosting_type='gbdt', num_leaves=64, learning_rate=0.01, n_estimators=2000,
-                               max_bin=425, subsample_for_bin=50000, objective='binary', min_split_gain=0,
-                               min_child_weight=5, min_child_samples=10, subsample=0.8, subsample_freq=1,
-                               colsample_bytree=1, reg_alpha=3, reg_lambda=5, seed=1000, n_jobs=-1, silent=True)
-    # 建议使用CV的方式训练预测。
-    model_lgb.fit(x_train, y_train,
-                  eval_names=['train'],
-                  eval_metric=['logloss', 'auc'],
-                  eval_set=[(x_valid, y_valid)],
-                  early_stopping_rounds=10)
+
+    dtrain = xgb.DMatrix(x_train, label=y_train)
+    dtest = xgb.DMatrix(x_test)
+
+    cv_res = xgb.cv(param, dtrain, num_boost_round=2000, early_stopping_rounds=30, nfold=5, metrics='auc',
+                    show_stdv=True)
+    print(cv_res)
+    bst = xgb.train(param, dtrain, num_boost_round=cv_res.shape[0])
+
     timer.print_time("训练时间")
-    y_pred = model_lgb.predict_proba(x_test)[:, 1]
+
+    y_pred = bst.predict(dtest)
+
     result_append['proba'] = y_pred
     result_append.to_csv('result.txt', index=False, header=False, sep='\t')
