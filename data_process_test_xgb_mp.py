@@ -552,6 +552,7 @@ if __name__ == "__main__":
     x_train = invite_df[:train_num].drop(["label"], axis=1).values
     x_test = invite_df[train_num:].drop(["label"], axis=1).values
 
+
     dtrain = xgb.DMatrix(x_train, label=y_train)
     dtest = xgb.DMatrix(x_test)
 
