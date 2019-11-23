@@ -548,6 +548,7 @@ if __name__ == "__main__":
     print(train_num)
     result_append.to_csv('result_append.txt', index=False, header=False, sep='\t')
 
+
     y_train = invite_df[:train_num]["label"].values
     x_train = invite_df[:train_num].drop(["label"], axis=1).values
     x_test = invite_df[train_num:].drop(["label"], axis=1).values
