@@ -427,7 +427,7 @@ if __name__ == "__main__":
        'question_to_subscribe_score_min', 'question_to_subscribe_score_mean',
        'question_to_subscribe_score_kurt', 'question_to_subscribe_score_num',
        'question_to_subscribe_score_ratio', 'question_duration']
-    invite_df = pd.read_csv('train_df.txt', index=False, header=False, sep='\t')
+    invite_df = pd.read_csv('train_df.txt', header=None, sep='\t')
     invite_df.columns = columns
 
     y_train = invite_df[:train_num]["label"].values
@@ -437,8 +437,8 @@ if __name__ == "__main__":
     dtrain = xgb.DMatrix(x_train, label=y_train)
     dtest = xgb.DMatrix(x_test)
 
-    cv_res = xgb.cv(param, dtrain, num_boost_round=2000, early_stopping_rounds=30, nfold=5, metrics='auc',
-                    show_stdv=True)
-    print(cv_res)
-    bst = xgb.train(param, dtrain, num_boost_round=cv_res.shape[0])
+    # cv_res = xgb.cv(param, dtrain, num_boost_round=2000, early_stopping_rounds=30, nfold=5, metrics='auc', show_stdv=True)
+    # print(cv_res)
+    bst = xgb.train(param, dtrain, num_boost_round=200)
+
 
