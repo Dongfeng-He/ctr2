@@ -554,10 +554,11 @@ if __name__ == "__main__":
     y_valid = valid_df["label"].values
     x_valid = valid_df.drop(["label", "time"], axis=1).values
     x_test = test_df.drop(["label", "time"], axis=1).values
-    model_lgb = LGBMClassifier(boosting_type='gbdt', num_leaves=64, learning_rate=0.01, n_estimators=2000,
-                               max_bin=425, subsample_for_bin=50000, objective='binary', min_split_gain=0,
-                               min_child_weight=5, min_child_samples=10, subsample=0.8, subsample_freq=1,
-                               colsample_bytree=1, reg_alpha=3, reg_lambda=5, seed=1000, n_jobs=-1, silent=True)
+    # model_lgb = LGBMClassifier(boosting_type='gbdt', num_leaves=64, learning_rate=0.05, n_estimators=2000,
+    #                            max_bin=425, subsample_for_bin=50000, objective='binary', min_split_gain=0,
+    #                            min_child_weight=5, min_child_samples=10, subsample=0.8, subsample_freq=1,
+    #                            colsample_bytree=1, reg_alpha=3, reg_lambda=5, seed=1000, n_jobs=-1, silent=True)
+    model_lgb = LGBMClassifier(n_estimators=2000, n_jobs=-1, objective='binary', seed=1000, silent=True)
     # 建议使用CV的方式训练预测。
     model_lgb.fit(x_train, y_train,
                   eval_names=['valid'],
