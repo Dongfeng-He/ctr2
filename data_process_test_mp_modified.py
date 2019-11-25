@@ -2,6 +2,7 @@ import copy
 import json
 import math
 import os
+from sklearn.utils import shuffle
 from collections import Counter
 from itertools import chain
 import datetime
@@ -45,17 +46,41 @@ def process_record(row):
     previous_records = []
     question = row["question"]
 
-
-    # 删除本次回答之前的回答
+    current_day, current_hour = extract_day_and_hour(row["time"])
     for record in row["answer_list"]:
-        if record[0] != question:
+        record_question, record_date, record_type = record
+        use_flag = 0
+        record_day, record_hour = extract_day_and_hour(record_date)
+        if 3861 <= current_day <= 3867:
+            if record_type == "1":
+                if 3838 <= record_day <= 3860:
+                    use_flag = 1
+            else:
+                if 3810 <= record_day <= 3860:
+                    use_flag = 1
+        elif 3868 <= current_day <= 3874:
+            if record_type == "1":
+                if 3845 <= record_day <= 3867:
+                    use_flag = 1
+            else:
+                if 3817 <= record_day <= 3867:
+                    use_flag = 1
+        else:
+            if current_day - record_day > 0:
+                use_flag = 1
+        if use_flag == 1:
             previous_records.append(record)
         else:
             break
-    current_day, current_hour = extract_day_and_hour(row["time"])
-
-
-
+    if 3861 <= current_day <= 3867:
+        invite_day_span = 22
+        answer_day_span = 50
+    elif 3868 <= current_day <= 3874:
+        invite_day_span = 22
+        answer_day_span = 50
+    else:
+        invite_day_span = current_day - 3838
+        answer_day_span = current_day - 3810
 
     invite_records = list(filter(lambda x: x[2] == "1", previous_records))
     total_answer_days = list(map(lambda x: extract_day_and_hour(x[1])[0], previous_records))
@@ -79,10 +104,10 @@ def process_record(row):
     answer_min_hour_gap = min(list(map(lambda x: abs(x - current_hour), total_answer_hours))) if len(total_answer_hours) > 0 else np.nan
     invite_min_hour_gap = min(list(map(lambda x: abs(x - current_hour), invite_answer_hours))) if len(invite_answer_hours) > 0 else np.nan
     # 回答/受邀各个区间的数量、总数量、受邀回答比
-    answer_num_1, answer_num_2, answer_num_3, answer_num_4, answer_num_5, answer_num_6 = get_detail_answer_num(total_answer_days)
-    invite_num_1, invite_num_2, invite_num_3, invite_num_4, invite_num_5, invite_num_6 = get_detail_invite_num(invite_answer_days)
-    record_num = len(previous_records)
-    invite_num = len(invite_records)
+    answer_num_1, answer_num_2, answer_num_3, answer_num_4, answer_num_5, answer_num_6 = get_detail_answer_num(total_answer_days, current_day, gap_day=1)
+    invite_num_1, invite_num_2, invite_num_3, invite_num_4, invite_num_5, invite_num_6 = get_detail_invite_num(invite_answer_days, current_day, gap_day=1)
+    record_num = len(previous_records) / answer_day_span
+    invite_num = len(invite_records) / invite_day_span if invite_day_span > 0 else len(invite_records)
     invite_ratio = invite_num / record_num if record_num > 0 else np.nan
     # 回答在一周内分布，该邀请所对应的数目
     week_num_list = get_week_answer_num(total_answer_days)
@@ -160,38 +185,38 @@ def extract_day_and_hour(time_str):
     return day, hour
 
 
-def get_detail_answer_num(total_answer_days):
+def get_detail_answer_num(total_answer_days, current_day, gap_day=1):
     answer_num_1, answer_num_2, answer_num_3, answer_num_4, answer_num_5, answer_num_6 = 0, 0, 0, 0, 0, 0
     for day in total_answer_days:
-        relative_day = day - 3807
-        if 0 <= relative_day < 10:
+        relative_day = current_day - day - gap_day
+        if 0 <= relative_day < 1:
             answer_num_1 += 1
-        elif 10 <= relative_day < 20:
+        elif 1 <= relative_day < 3:
             answer_num_2 += 1
-        elif 20 <= relative_day < 30:
+        elif 3 <= relative_day < 7:
             answer_num_3 += 1
-        elif 30 <= relative_day < 40:
+        elif 7 <= relative_day < 15:
             answer_num_4 += 1
-        elif 40 <= relative_day < 50:
+        elif 15 <= relative_day < 30:
             answer_num_5 += 1
         else:
             answer_num_6 += 1
     return answer_num_1, answer_num_2, answer_num_3, answer_num_4, answer_num_5, answer_num_6
 
 
-def get_detail_invite_num(invite_answer_days):
+def get_detail_invite_num(invite_answer_days, current_day, gap_day=1):
     invite_num_1, invite_num_2, invite_num_3, invite_num_4, invite_num_5, invite_num_6 = 0, 0, 0, 0, 0, 0
     for day in invite_answer_days:
-        relative_day = day - 3838
-        if 0 <= relative_day < 5:
+        relative_day = current_day - day - gap_day
+        if 0 <= relative_day < 1:
             invite_num_1 += 1
-        elif 5 <= relative_day < 10:
+        elif 1 <= relative_day < 3:
             invite_num_2 += 1
-        elif 10 <= relative_day < 15:
+        elif 3 <= relative_day < 7:
             invite_num_3 += 1
-        elif 15 <= relative_day < 20:
+        elif 7 <= relative_day < 15:
             invite_num_4 += 1
-        elif 20 <= relative_day < 25:
+        elif 15 <= relative_day < 30:
             invite_num_5 += 1
         else:
             invite_num_6 += 1
@@ -216,6 +241,14 @@ def get_week_answer_num(total_answer_days):
             answer_num_6 += 1
         else:
             answer_num_7 += 1
+    if len(total_answer_days) > 0:
+        answer_num_1 /= len(total_answer_days)
+        answer_num_2 /= len(total_answer_days)
+        answer_num_3 /= len(total_answer_days)
+        answer_num_4 /= len(total_answer_days)
+        answer_num_5 /= len(total_answer_days)
+        answer_num_6 /= len(total_answer_days)
+        answer_num_7 /= len(total_answer_days)
     return answer_num_1, answer_num_2, answer_num_3, answer_num_4, answer_num_5, answer_num_6, answer_num_7
 
 
@@ -328,7 +361,7 @@ def process_invite(index, invite_df):
     # 问题创建时间与现在时间差值
     invite_df["question_duration"] = invite_df.apply(lambda row: extract_day_and_hour(row["time"])[0] - extract_day_and_hour(row["question_time"])[0], axis=1)
     # Drop 不进模型的字段
-    invite_df = invite_df.drop(["question", "member", "time", "original_time", "creation_keywrods", "creation_level",
+    invite_df = invite_df.drop(["question", "member", "original_time", "creation_keywrods", "creation_level",
                                 "creation_popularity", "register_type", "register_platform", "subscribe_topics",
                                 "interest_topics", "question_time", "title_single_words", "title_words",
                                 "content_single_words", "content_words", "topics", "answer_list", "previous_answer",
@@ -510,20 +543,26 @@ if __name__ == "__main__":
     """
     训练
     """
-    y_train = invite_df[:train_num]["label"].values
-    x_train = invite_df[:train_num].drop(["label"], axis=1).values
-    x_test = invite_df[train_num:].drop(["label"], axis=1).values
-    x_train, x_valid, y_train, y_valid = train_test_split(x_train, y_train, test_size=0.2, random_state=66)
+    invite_df["time"] = invite_df["time"].apply(lambda x: int(x.replace("D", "").split("-")[0]))
+    train_df = invite_df[:train_num]
+    test_df = invite_df[train_num:]
+    valid_df = train_df[(train_df["time"] >= 3861) & (train_df["time"] <= 3867)]
+    train_df = train_df[(train_df["time"] >= 3811) & (train_df["time"] <= 3860)]
+    y_train = train_df["label"].values
+    x_train = train_df.drop(["label", "time"], axis=1).values
+    y_valid = valid_df["label"].values
+    x_valid = valid_df.drop(["label", "time"], axis=1).values
+    x_test = test_df.drop(["label", "time"], axis=1).values
     model_lgb = LGBMClassifier(boosting_type='gbdt', num_leaves=64, learning_rate=0.01, n_estimators=2000,
                                max_bin=425, subsample_for_bin=50000, objective='binary', min_split_gain=0,
                                min_child_weight=5, min_child_samples=10, subsample=0.8, subsample_freq=1,
                                colsample_bytree=1, reg_alpha=3, reg_lambda=5, seed=1000, n_jobs=-1, silent=True)
     # 建议使用CV的方式训练预测。
     model_lgb.fit(x_train, y_train,
-                  eval_names=['train'],
-                  eval_metric=['logloss', 'auc'],
+                  eval_names=['valid'],
+                  eval_metric=['auc'],
                   eval_set=[(x_valid, y_valid)],
-                  early_stopping_rounds=10)
+                  early_stopping_rounds=30)
     timer.print_time("训练时间")
     y_pred = model_lgb.predict_proba(x_test)[:, 1]
     result_append['proba'] = y_pred

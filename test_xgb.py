@@ -393,7 +393,7 @@ if __name__ == "__main__":
     """
     训练
     """
-    param = {"n_estimators": 2000,
+    param = {"n_estimators": 400,
              'learning_rate ': 0.01,
              'silent': 1,
              'objective': 'binary:logistic',
