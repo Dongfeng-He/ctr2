@@ -548,6 +548,7 @@ if __name__ == "__main__":
     test_df = invite_df[train_num:]
     valid_df = train_df[(train_df["time"] >= 3861) & (train_df["time"] <= 3867)]
     train_df = train_df[(train_df["time"] >= 3811) & (train_df["time"] <= 3860)]
+    train_df = shuffle(train_df)
     y_train = train_df["label"].values
     x_train = train_df.drop(["label", "time"], axis=1).values
     y_valid = valid_df["label"].values
