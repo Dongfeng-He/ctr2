@@ -361,7 +361,7 @@ def process_invite(index, invite_df):
     # 问题创建时间与现在时间差值
     invite_df["question_duration"] = invite_df.apply(lambda row: extract_day_and_hour(row["time"])[0] - extract_day_and_hour(row["question_time"])[0], axis=1)
     # Drop 不进模型的字段
-    invite_df = invite_df.drop(["question", "member", "original_time", "creation_keywrods", "creation_level",
+    invite_df = invite_df.drop(["original_time", "creation_keywrods", "creation_level",
                                 "creation_popularity", "register_type", "register_platform", "subscribe_topics",
                                 "interest_topics", "question_time", "title_single_words", "title_words",
                                 "content_single_words", "content_words", "topics", "answer_list", "previous_answer",
@@ -532,7 +532,7 @@ if __name__ == "__main__":
     gc_mp(pool, apply_results, result_list, chunk_list)
     # 类别特征转换
     # TODO: '用户id','问题id' 要保留？
-    class_feat = ['gender', 'frequency', 'bi_feat1', 'bi_feat2', 'bi_feat3', 'bi_feat4', 'bi_feat5', 'mul_feat1',
+    class_feat = ["question", "member", 'gender', 'frequency', 'bi_feat1', 'bi_feat2', 'bi_feat3', 'bi_feat4', 'bi_feat5', 'mul_feat1',
                   'mul_feat2', 'mul_feat3', 'mul_feat4', 'mul_feat5', 'current_week', 'current_hour',
                   'current_week_hour', 'last_type']
     encoder = LabelEncoder()
